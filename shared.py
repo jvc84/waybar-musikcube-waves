@@ -1,54 +1,63 @@
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, Popen, CalledProcessError
 from sys import exit
+import os
+
+player = "any"
 
 
-player = ""
+def give_output(command):
+    return check_output([command], shell=True)
+
+
+def check_music_player() -> (bool, bool):
+    global player
+
+    if player == "cava":
+        return True
+
+    try:
+        status = get_status()
+
+        if status == b'Playing\n':
+            mus = True
+        else:
+            mus = False
+
+        if b'P' in status:
+            play = True
+        else:
+            play = False
+
+    except CalledProcessError:
+        mus =  False
+        play = False
+
+    return mus, play
 
 
 def get_status():
     global player
 
-    output = check_output(
-        [f'playerctl status --player="{player}" 2> /dev/null'],
-        shell=True)
+    command = ''
+
+    if player == "any":
+        command = 'playerctl -l'
+    else:
+        f'playerctl status --player="{player}"'
+
+    output = give_output(command)
+
+    if player == "any":
+        is_playing = b'Paused\n'
+        list = str(output)[2:-3].split('\\n')
+        for pl in list:
+            if give_output(f'playerctl status --player="{pl}"') == b'Playing\n':
+                is_playing = b'Playing\n'
+                break
+
+        output = is_playing
 
     return output
-
-
-def check_music():
-    global player
-
-    if player == "cava":
-        return True
-
-    try:
-        status = get_status()
-
-        if b'Playing' in status:
-            return True
-        else:
-            return False
-
-    except CalledProcessError:
-        return False
-
-
-def check_player():
-    global player
-
-    if player == "cava":
-        return True
-
-    try:
-        status = get_status()
-
-        if b'P' in status:
-            return True
-        else:
-            return False
-
-    except CalledProcessError:
-        return False
 
 
 def frame_multiplier(frames, repeats):
@@ -57,6 +66,26 @@ def frame_multiplier(frames, repeats):
         more_frames += frames
 
     return more_frames
+
+
+def run_proc(args, token):
+    string_args = ""
+
+    for i in args:
+        string_args += ("'" + str(i) + "'" + " ")
+
+    pid = Popen([string_args], shell=True)
+
+    try:
+        pid.wait()
+    except KeyboardInterrupt:
+        pid.kill()
+
+    remaining_pids = str(check_output([f"ps aux | grep {token} " + " | awk '{print $2}'"], shell=True))[
+                2:-3].split("\\n")
+
+    for pid in remaining_pids:
+        os.system(f"kill -9 {pid}")
 
 
 def show_help():
